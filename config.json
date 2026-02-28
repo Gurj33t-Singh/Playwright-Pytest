@@ -1,0 +1,23 @@
+{
+  "host": "https://mseva.url.gov.in",
+  "localhost": "http://localhost:8082",
+  "stateCode": "State",
+  "cityCode": "City",
+  "auth_header": {
+    "authorization": "Basic ABC"
+  },
+  "credentials": {
+    "PGR": {
+      "username": "ABC",
+      "password": "XYZ",
+      "tenantId": "state.city",
+      "type": "Employee"
+    },
+    "TL": {
+      "username": "ABC",
+      "password": "XYZ",
+      "tenantId": "Test City",
+      "type": "Employee"
+    }
+  }
+}
