@@ -1,4 +1,4 @@
-from playwright.sync_api import Page
+from playwright.sync_api import Error, Page, TimeoutError as PlaywrightTimeoutError
 
 class EmpMonoUI:
 
@@ -18,9 +18,29 @@ class EmpMonoUI:
 
         # left menu options 
         self.left_menu = page.locator("#menu-container")
+        self.left_menu_home_btn = self.left_menu.locator('#HOME-0')
+
+        # quick action 
+        self.quick_action_btn = page.locator(".quick-action-button").get_by_role("button")
+        self.quick_action_dd = page.locator("#menu-list-grow").get_by_role("menuitem")
         
     def left_menu_selection(self, option_id: str):
-        self.left_menu.locator(f'[id="{option_id}"]').click()
+        # Menu re-renders while expanding sections; re-locate and retry click.
+        self.left_menu.wait_for(state="visible", timeout=15000)
+        last_err = None
+        for _ in range(4):
+            target = self.left_menu.locator(f"#{option_id}").first
+            try:
+                target.wait_for(state="visible", timeout=8000)
+                target.scroll_into_view_if_needed(timeout=5000)
+                target.click(timeout=8000,
+                             force=True #this is specifically for mac
+                             )
+                return
+            except (PlaywrightTimeoutError, Error) as err:
+                last_err = err
+                self.page.wait_for_timeout(250)
+        raise last_err
 
     def logout(self):
         self.profile_icon.click()
@@ -31,3 +51,7 @@ class EmpMonoUI:
         self.logout_yes_btn.click()
         self.page.wait_for_load_state("networkidle")
 
+    def quick_action_option(self, option_name):
+        self.quick_action_btn.click()
+        self.quick_action_dd.filter(has_text=option_name).click()
+        

@@ -3,9 +3,6 @@ import pytest
 from utils import helpers
 
 BASE_URL = helpers.get_env("host")
-MODULE = "TL"
-USERNAME = helpers.get_creds(MODULE).get("username")
-PASSWORD = helpers.get_creds(MODULE).get("password")
 
 @pytest.mark.ui
 def test_tl_landing_page(tl_context):
@@ -34,13 +31,21 @@ def test_tl_landing_page(tl_context):
     # Find localization leaks
     loc_codes = helpers.find_loc_codes(locales)
     print("\nLocalization leaks:", loc_codes)
-    helpers.write_json(loc_codes, MODULE + '_locales.json')
+    helpers.write_json(loc_codes, "TL" + '_locales.json')
 
     assert True
     page.close()
 
 @pytest.mark.ui
 def test_demo(page_chr):
+    tl_su_creds = helpers.get_creds("TL", "SU")
+    if not tl_su_creds:
+        pytest.skip("Missing credentials: TL.SU in config.json")
+
+    username = tl_su_creds.get("username")
+    password = tl_su_creds.get("password")
+    if not username or not password:
+        pytest.skip("Incomplete credentials: TL.SU username/password in config.json")
 
     # Language selection
     # page = context.new_page()
@@ -63,8 +68,8 @@ def test_demo(page_chr):
 
 
     # Employee Login
-    page_chr.locator("input[name='username']").fill(USERNAME)
-    page_chr.locator("input[name='password']").fill(PASSWORD)
+    page_chr.locator("input[name='username']").fill(username)
+    page_chr.locator("input[name='password']").fill(password)
 
     # City selection
     dropdown_wrapper = page_chr.locator(".employee-select-wrap.login-city-dd")

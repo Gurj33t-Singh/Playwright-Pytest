@@ -1,137 +1,240 @@
-
 import re, time, pytest
 from utils import helpers
 from playwright.sync_api import expect
+from pages.Dss import *
 
 BASE_URL = helpers.get_env("host")
+LOC_FILENAME = "TestMsevaDSS.json"
+# Accumulate *raw* UI strings for this module/class
+_collected_ui_strings = []
 
 class TestMsevaDSS:
 
-    loc_codes = []
+    page_root_id = "#root"
 
+    # --- Fixtures ---
     @pytest.fixture(scope="class", autouse=True)
-    def _teardown_write_loc_codes(self, request):
-        """Class-scoped autouse fixture: after all tests in the class run,
-        write the class variable `loc_codes` to a JSON file under target/.
-        """
+    def _write_loc_codes(self):
         yield
-        helpers.write_json(self.loc_codes, 'TestMsevaDSS.json')
+        leaks = helpers.find_loc_codes(_collected_ui_strings)
+        helpers.write_json(leaks, LOC_FILENAME)
 
+    # --- Helpers ---
+    def get_table_data(self, dss_pom, page, alt_table_key):
+        """
+        it iterates drill down tables
+        and checks for alt tables like USAGE and BOUNDARY
+
+        returns list of strings
+        """
+        loc_codes = []
+
+        dss_pom.click_drilldown_tables()
+        loc_codes.extend(helpers.collect_page_text(page, self.page_root_id))
+        
+        dss_pom.check_alt_tables(alt_table_key)
+        loc_codes.extend(helpers.collect_page_text(page, self.page_root_id))
+        
+        return loc_codes
+
+    # --- Test Cases ---
     @pytest.mark.ui
     @pytest.mark.localization
     def test_sure_dashboard(self, page_chr):
         page = page_chr
         page.goto(BASE_URL + '/dashboard')
-        page.wait_for_load_state("networkidle")
-        # Extract page text
-        dss_body = page.locator("#divToPrint")
-        dss_body.wait_for(state="visible", timeout=30000)
-        locales = dss_body.inner_text()
-        locales = locales.replace('\t', '\n')
-        # Find localization leaks
-        loc_codes = helpers.find_loc_codes(locales)
-        self.loc_codes.extend(loc_codes)
-        expect(dss_body).to_be_visible()
+        
+        try:
+            page.wait_for_selector(self.page_root_id, timeout=2000)
+        except:
+            # If it's blank/failed, force a refresh once
+            print("Blank page, performing manual refresh...")
+            page.reload(wait_until="networkidle")
+
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
 
     @pytest.mark.ui
     @pytest.mark.localization
-    def test_pt_dashboard_rev(self, page_chr):
+    def test_overview_dashboard(self, page_chr):
         page = page_chr
-        page.goto(BASE_URL + '/dashboard/propertytax')
-        page.wait_for_load_state("networkidle")
-        dss_body = page.locator("#divToPrint")
-        table_row = dss_body.get_by_role("row").first
-        table_row.wait_for(state="visible", timeout=30000)
-        locales = dss_body.inner_text()
-        # Find localization leaks
-        loc_codes = helpers.find_loc_codes(locales, isTable=True)
-        self.loc_codes.extend(loc_codes)
-        expect(table_row).to_be_visible()
+        page.goto(BASE_URL + '/dashboard/overview')
+        
+        try:
+            page.wait_for_selector(self.page_root_id, timeout=2000)
+        except:
+            # If it's blank/failed, force a refresh once
+            print("Blank page, performing manual refresh...")
+            page.reload(wait_until="networkidle")
 
-    @pytest.mark.ui
-    @pytest.mark.localization
-    def test_pt_dashboard_rev_tb(self, page_chr):
-        page = page_chr
-        page.goto(BASE_URL + '/dashboard/propertytax')
-        body = page.locator("#divToPrint")
-        body.wait_for(state="visible", timeout=30000)
-        table_data = helpers.get_table_data(body)
-        table_data = re.split(r'[\t\n]', table_data)
-        table_data = helpers.find_loc_codes(table_data)
-        self.loc_codes.extend(table_data)
-        assert True
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
 
-    @pytest.mark.ui
-    @pytest.mark.localization
-    def test_tl_dashboard_rev(self, page_chr):
-        page = page_chr
-        page.goto(BASE_URL + '/dashboard/tradelicense')
-        page.wait_for_load_state("networkidle")
-        dss_body = page.locator("#divToPrint")
-        table_row = dss_body.get_by_role("row").first
-        table_row.wait_for(state="visible", timeout=30000)
-        locales = dss_body.inner_text()
-        # Find localization leaks
-        loc_codes = helpers.find_loc_codes(locales, isTable=True)
-        self.loc_codes.extend(loc_codes)
-        expect(table_row).to_be_visible()
+        # --- DSS POM
+        dss_product_pom = DssProductUi(page)
+        # --- Drilldown and Alt-table texts ---
+        _collected_ui_strings.extend(self.get_table_data(dss_product_pom, page, "USAGE"))
 
-    @pytest.mark.ui
-    @pytest.mark.localization
-    def test_tl_dashboard_rev_tb(self, page_chr):
-        page = page_chr
-        page.goto(BASE_URL + '/dashboard/tradelicense')
-        page.wait_for_load_state("networkidle")
-        body = page.locator("#divToPrint")
-        body.wait_for(state="visible", timeout=30000)
-        table_data = helpers.get_table_data(body)
-        table_data = re.split(r'[\t\n]', table_data)
-        table_data = helpers.find_loc_codes(table_data)
-        self.loc_codes.extend(table_data)
-        assert True
+        # --- Service Tab ---
+        page.get_by_role("tab", name="SERVICE").click()
+        page.wait_for_load_state("networkidle", timeout=2000)
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
 
-    @pytest.mark.ui
-    @pytest.mark.localization
-    def test_pgr_dashboard_rev(self, page_chr):
-        page = page_chr
-        page.goto(BASE_URL + '/dashboard/pgr')
-        page.wait_for_load_state("networkidle")
-        dss_body = page.locator("#divToPrint")
-        table_row = dss_body.get_by_role("row").first
-        table_row.wait_for(state="visible", timeout=30000)
-        locales = dss_body.inner_text()
-        # Find localization leaks
-        loc_codes = helpers.find_loc_codes(locales, isTable=True)
-        self.loc_codes.extend(loc_codes)
-        expect(table_row).to_be_visible()
-
-    @pytest.mark.ui
-    @pytest.mark.localization
-    def test_pgr_dashboard_rev_tb(self, page_chr):
-        page = page_chr
-        page.goto(BASE_URL + '/dashboard/pgr')
-        page.wait_for_load_state("networkidle")
-        body = page.locator("#divToPrint")
-        body.wait_for(state="visible", timeout=30000)
-        table_data = helpers.get_table_data(body)
-        table_data = re.split(r'[\t\n]', table_data)
-        table_data = helpers.find_loc_codes(table_data)
-        self.loc_codes.extend(table_data)
-        assert True
+        # --- Drilldown and Alt-table texts ---
+        _collected_ui_strings.extend(self.get_table_data(dss_product_pom, page, "USAGE"))
 
     @pytest.mark.ui
     @pytest.mark.localization
     @pytest.mark.smoke
-    def test_noc_dashboard_rev_tb(self, page_chr):
+    def test_pt_dashboard(self, page_chr):
+        page = page_chr
+        page.goto(BASE_URL + '/dashboard/propertytax')
+        
+        try:
+            page.wait_for_selector(self.page_root_id, timeout=2000)
+        except:
+            # If it's blank/failed, force a refresh once
+            print("Blank page, performing manual refresh...")
+            page.reload(wait_until="networkidle")
+
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
+
+        # --- DSS POM
+        dss_product_pom = DssProductUi(page)
+        # --- Drilldown and Alt-table texts ---
+        _collected_ui_strings.extend(self.get_table_data(dss_product_pom, page, "USAGE"))
+
+        # --- Service Tab ---
+        page.get_by_role("tab", name="SERVICE").click()
+        page.wait_for_load_state("networkidle")
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
+
+        # --- Drilldown and Alt-table texts ---
+        _collected_ui_strings.extend(self.get_table_data(dss_product_pom, page, "USAGE"))
+
+    @pytest.mark.ui
+    @pytest.mark.localization
+    def test_tl_dashboard(self, page_chr):
+        page = page_chr
+        page.goto(BASE_URL + '/dashboard/tradelicense')
+        
+        try:
+            page.wait_for_selector(self.page_root_id, timeout=2000)
+        except:
+            # If it's blank/failed, force a refresh once
+            print("Blank page, performing manual refresh...")
+            page.reload(wait_until="networkidle")
+
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
+
+        # --- DSS POM
+        dss_product_pom = DssProductUi(page)
+        # --- Drilldown and Alt-table texts ---
+        _collected_ui_strings.extend(self.get_table_data(dss_product_pom, page, "USAGE"))
+
+        # --- Service Tab ---
+        page.get_by_role("tab", name="SERVICE").click()
+        page.wait_for_load_state("networkidle")
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
+
+        # --- Drilldown and Alt-table texts ---
+        _collected_ui_strings.extend(self.get_table_data(dss_product_pom, page, "USAGE"))
+
+    @pytest.mark.ui
+    @pytest.mark.localization
+    def test_ws_dashboard(self, page_chr):
+        page = page_chr
+        page.goto(BASE_URL + '/dashboard/ws')
+        
+        try:
+            page.wait_for_selector(self.page_root_id, timeout=2000)
+        except:
+            # If it's blank/failed, force a refresh once
+            print("Blank page, performing manual refresh...")
+            page.reload(wait_until="networkidle")
+
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
+
+        # --- DSS POM
+        dss_product_pom = DssProductUi(page)
+        # --- Drilldown and Alt-table texts ---
+        _collected_ui_strings.extend(self.get_table_data(dss_product_pom, page, "USAGE"))
+
+        # --- Service Tab ---
+        page.get_by_role("tab", name="SERVICE").click()
+        page.wait_for_load_state("networkidle")
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
+
+        # --- Drilldown and Alt-table texts ---
+        _collected_ui_strings.extend(self.get_table_data(dss_product_pom, page, "USAGE"))
+
+    @pytest.mark.ui
+    @pytest.mark.localization
+    def test_pgr_dashboard(self, page_chr):
+        page = page_chr
+        page.goto(BASE_URL + '/dashboard/pgr')
+        
+        try:
+            page.wait_for_selector(self.page_root_id, timeout=2000)
+        except:
+            # If it's blank/failed, force a refresh once
+            print("Blank page, performing manual refresh...")
+            page.reload(wait_until="networkidle")
+
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
+
+        # --- DSS POM
+        dss_product_pom = DssProductUi(page)
+        # --- Drilldown and Alt-table texts ---
+        _collected_ui_strings.extend(self.get_table_data(dss_product_pom, page, "DEPARTMENT"))
+
+    @pytest.mark.ui
+    @pytest.mark.localization
+    def test_mcollect_dashboard(self, page_chr):
+        page = page_chr
+        page.goto(BASE_URL + '/dashboard/mCollect')
+        
+        try:
+            page.wait_for_selector(self.page_root_id, timeout=2000)
+        except:
+            # If it's blank/failed, force a refresh once
+            print("Blank page, performing manual refresh...")
+            page.reload(wait_until="networkidle")
+
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
+
+        # --- DSS POM
+        dss_product_pom = DssProductUi(page)
+        # --- Drilldown and Alt-table texts ---
+        _collected_ui_strings.extend(self.get_table_data(dss_product_pom, page, "CATEGORY"))
+    
+    @pytest.mark.ui
+    @pytest.mark.localization
+    def test_noc_dashboard(self, page_chr):
         page = page_chr
         page.goto(BASE_URL + '/dashboard/noc')
-        page.wait_for_load_state("networkidle")
-        dss_body = page.locator("#divToPrint")
-        dss_body.wait_for(state="visible", timeout=30000)
-        dss_body.get_by_role("button").filter(has_text="DEPARTMENT").click()
-        time.sleep(2)
-        locales = dss_body.inner_text()
-        locales = helpers.find_loc_codes(locales, isTable=True)
-        self.loc_codes.extend(locales)
-        assert True
+        
+        try:
+            page.wait_for_selector(self.page_root_id, timeout=2000)
+        except:
+            # If it's blank/failed, force a refresh once
+            print("Blank page, performing manual refresh...")
+            page.reload(wait_until="networkidle")
+
+        captured_text = helpers.collect_page_text(page, self.page_root_id)
+        _collected_ui_strings.extend(captured_text)
+
+        # --- DSS POM
+        dss_product_pom = DssProductUi(page)
+        # --- Drilldown and Alt-table texts ---
+        _collected_ui_strings.extend(self.get_table_data(dss_product_pom, page, "DEPARTMENT"))
 

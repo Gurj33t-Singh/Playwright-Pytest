@@ -2,8 +2,6 @@ import pytest
 from utils import helpers
 
 BASE_URL = helpers.get_env("host")
-USERNAME = helpers.get_creds("TL").get("username")
-PASSWORD = helpers.get_creds("TL").get("password")
 
 @pytest.mark.ui
 def test_language_selection(page_chr):
@@ -30,11 +28,20 @@ def test_language_selection(page_chr):
 
 @pytest.mark.ui
 def test_employee_login(page_chr):
+    tl_su_creds = helpers.get_creds("TL", "SU")
+    if not tl_su_creds:
+        pytest.skip("Missing credentials: TL.SU in config.json")
+
+    username = tl_su_creds.get("username")
+    password = tl_su_creds.get("password")
+    if not username or not password:
+        pytest.skip("Incomplete credentials: TL.SU username/password in config.json")
+
     page_chr.goto(BASE_URL + "/digit-ui/employee/user/login")
     page_chr.wait_for_load_state("networkidle")
     # Employee Login
-    page_chr.locator("input[name='username']").fill(USERNAME)
-    page_chr.locator("input[name='password']").fill(PASSWORD)
+    page_chr.locator("input[name='username']").fill(username)
+    page_chr.locator("input[name='password']").fill(password)
     # City selection
     dropdown_wrapper = page_chr.locator(".employee-select-wrap.login-city-dd")
     dropdown_wrapper.click()

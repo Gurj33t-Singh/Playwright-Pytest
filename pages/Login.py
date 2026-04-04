@@ -36,6 +36,7 @@ class EmployeeLogin:
         
         # City selection flow
         self.city_input.click()
+        self.city_list.wait_for(state="visible")
         # self.city_select_input.fill("tenant_id")
         self.city_list.locator(f'[id="{tenant_id}"]').click()
         

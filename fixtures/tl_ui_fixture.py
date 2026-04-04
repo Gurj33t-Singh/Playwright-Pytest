@@ -2,11 +2,18 @@ import pytest
 from utils import helpers
 
 BASE_URL = helpers.get_env("host")
-USERNAME = helpers.get_creds("PGR").get("username")
-PASSWORD = helpers.get_creds("PGR").get("password")
 
 @pytest.fixture(scope="session")
 def tl_context(browser_chr):
+    tl_su_creds = helpers.get_creds("TL", "SU")
+    if not tl_su_creds:
+        pytest.skip("Missing credentials: TL.SU in config.json")
+
+    username = tl_su_creds.get("username")
+    password = tl_su_creds.get("password")
+    if not username or not password:
+        pytest.skip("Incomplete credentials: TL.SU username/password in config.json")
+
     ctx = browser_chr.new_context()
     page = ctx.new_page()
     page.goto(BASE_URL + "/digit-ui/employee/user/login")
@@ -14,8 +21,8 @@ def tl_context(browser_chr):
     page.locator("input[name='username']").wait_for(state="visible")
 
     # Employee Login
-    page.locator("input[name='username']").fill(USERNAME)
-    page.locator("input[name='password']").fill(PASSWORD)
+    page.locator("input[name='username']").fill(username)
+    page.locator("input[name='password']").fill(password)
 
     # City selection
     dropdown_wrapper = page.locator(".employee-select-wrap.login-city-dd")
