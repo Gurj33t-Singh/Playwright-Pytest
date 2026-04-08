@@ -2,4 +2,5 @@
 pytest_plugins = [
     "fixtures.browser_fixtures",
     "fixtures.tl_ui_fixture",
+    "utils.healer"
 ]

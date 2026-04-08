@@ -86,7 +86,6 @@ class TestMsevaDSS:
 
     @pytest.mark.ui
     @pytest.mark.localization
-    @pytest.mark.smoke
     def test_pt_dashboard(self, page_chr):
         page = page_chr
         page.goto(BASE_URL + '/dashboard/propertytax')

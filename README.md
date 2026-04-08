@@ -130,3 +130,6 @@ allure serve output/allure-results
 - Current UI tests are sync Playwright style.
 - Keep secrets out of Git; avoid committing real credentials in `config.json`.
 - Use markers (`ui`, `api`, `localization`, `smoke`) to scope executions.
+
+
+ollama run qwen2.5-coder:1.5b
