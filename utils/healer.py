@@ -1,71 +1,58 @@
-import requests, pytest
+import requests
 from playwright.sync_api import Page, Locator
 
+MODEL_URL = "http://localhost:11434/api/generate"
+MODEL_NAME = "gemma4:e2b"
+
 class SmartHealer:
-    def __init__(self, page: Page, model= "qwen3.5:4b"):
+    def __init__(self, page: Page, model=MODEL_NAME):
         self.page = page
         self.model = model
-        self.ollama_url = "http://localhost:11434/api/generate"
+        self.ai_url = MODEL_URL
 
-    def get_locator(self, selector: str, description: str) -> Locator:
-        """Returns a Playwright Locator. Heals automatically if the initial selector fails."""
+    def get_locator(self, css_selector: str, description: str) -> Locator:
+        """Attempts to find an element; heals via Ollama if it fails."""
         try:
-            # Check if the element is visible/present within 3 seconds
-            element = self.page.locator(selector)
-            element.wait_for(state="attached", timeout=3000)
+            # Short timeout for the initial check to trigger healing quickly
+            element = self.page.locator(css_selector)
+            element.wait_for(state="attached", timeout=2000)
             return element
         except Exception:
-            print(f"⚠️ [Healer] '{selector}' failed. Consulting ollama for: '{description}'...")
+            print(f"[HealerAI] CSS Locator '{css_selector}' failed. AI searching for: '{description}'")
             return self._heal(description)
 
     def _heal(self, description: str) -> Locator:
-        # 1. Capture a compact DOM snapshot
-        # We target interactive elements to keep the prompt small
+        # Extracting a smarter, smaller snapshot of the interactive DOM
         html_snapshot = self.page.evaluate("""
             () => {
-                const elements = document.querySelectorAll('button, input, a, [role="button"], select');
-                return Array.from(elements).map(el => el.outerHTML).join('\\n').substring(0, 8000);
+                const elements = document.querySelectorAll('button, input, a, select, [role="button"]');
+                return Array.from(elements).map(el => {
+                    return `<${el.tagName.toLowerCase()} id="${el.id}" name="${el.name}" placeholder="${el.placeholder}" class="${el.className}" aria-label="${el.getAttribute('aria-label')}">${el.innerText}</${el.tagName.toLowerCase()}>`;
+                }).join('\\n').substring(0, 5000);
             }
         """)
         
-        # 2. Build the AI Prompt
         prompt = f"""
-        Find the CSS selector for: "{description}"
-        HTML: {html_snapshot}
-        
-        CRITICAL: Return ONLY the raw string. 
-        Example: input[name="user"]
-        DO NOT include the word "css", DO NOT use markdown, DO NOT explain.
+        The user is looking for: "{description}"
+        Here is the current simplified HTML:
+        {html_snapshot}
+
+        Task: Provide the most accurate CSS selector to find this element.
+        Return ONLY the raw CSS selector string. No explanation, no markdown.
         """
 
         try:
-            response = requests.post(self.ollama_url, json={
+            response = requests.post(self.ai_url, json={
                 "model": self.model,
                 "prompt": prompt,
                 "stream": False,
                 "think": False,
                 "options": {"temperature": 0}
-            }, timeout=30000)
+            }, timeout=30)
             
-            raw_response = response.json()['response'].strip()
-            
-            # SANITIZATION: Remove AI fluff that causes Playwright to crash
-            # Removes "css", markdown backticks, and common labels
-            clean_selector = (raw_response
-                              .replace("css", "")
-                              .replace("Selector:", "")
-                              .replace("```css", "")
-                              .replace("```", "")
-                              .strip())
-            
-            print(f"✅ [Healer] Cleaned suggested locator: {clean_selector}")
-            return self.page.locator(clean_selector).first
-            
+            new_selector = response.json()['response'].strip().replace("`", "").replace("css", "")
+            print(f"[HealerAI] Suggested new selector: {new_selector}")
+            return self.page.locator(new_selector).first
         except Exception as e:
-            print(f"❌ [Healer] Critical Failure: {e}")
+            print(f"[HealerAI] Healing failed: {e}")
             raise
-        
-
-@pytest.fixture
-def healer(page_chr):
-    return SmartHealer(page_chr)

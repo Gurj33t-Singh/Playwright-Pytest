@@ -1,0 +1,6 @@
+[HealerAI] CSS Locator '#test-employee-phone' failed. AI searching for: 'The employee phone/username input field'
+[HealerAI] Suggested new selector: #employee-phone
+[HealerAI] CSS Locator '#test-employee-password' failed. AI searching for: 'The employee password input field'
+[HealerAI] Suggested new selector: #employee-password
+[HealerAI] CSS Locator '#test-person-city' failed. AI searching for: 'The city selection dropdown trigger'
+[HealerAI] Suggested new selector: #person-city
